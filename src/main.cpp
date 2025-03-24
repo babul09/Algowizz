@@ -35,7 +35,7 @@ int main ()
 		ClearBackground(BLACK);
 
 		// draw some text using the default font
-		DrawText("Hello Raylib", 200,200,20,WHITE);
+		DrawText("Welcome to Algowizz", 200,20,20,WHITE);
 
 		// draw our texture to the screen
 		DrawTexture(wabbit, 400, 200, WHITE);

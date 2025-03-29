@@ -1,229 +1,297 @@
 #include "raylib.h"
-#include "quicksort.h" // Include the new header file
 #include "resource_dir.h"   // utility header for SearchAndSetResourceDir
-#include <stdlib.h>         // For rand(), srand()
-#include <time.h>           // For time()
+#include "visualization_state.h" // Include the new state management
+#include "ui_components.h"     // Include the button component
 
-int main ()
+#include <string> // For std::string
+
+//----------------------------------------------------------------------------------
+// Types and Structures Definition
+//----------------------------------------------------------------------------------
+typedef enum {
+    SCREEN_MAIN_MENU,
+    SCREEN_VISUALIZATION,
+    SCREEN_SETTINGS // Added placeholder
+    // Add other screens if needed
+} GameScreen;
+
+//----------------------------------------------------------------------------------
+// Global Variables Definition
+//----------------------------------------------------------------------------------
+static const int screenWidth = 1200; // Increased width
+static const int screenHeight = 800; // Increased height
+
+static GameScreen currentScreen = SCREEN_MAIN_MENU;
+static VisualizationState vizState = {}; // Global state for visualization
+
+// UI Elements
+static Texture2D buttonTexture;
+static NPatchInfo buttonNpatchInfo;
+static Font mainFont; // Optional: Load a custom font
+
+//----------------------------------------------------------------------------------
+// Module Functions Declaration
+//----------------------------------------------------------------------------------
+static void UpdateDrawFrame(void);          // Update and Draw one frame
+
+// Screen specific functions
+static void UpdateMainMenuScreen(void);
+static void DrawMainMenuScreen(void);
+static void UpdateVisualizationScreen(void);
+static void DrawVisualizationScreen(void);
+static void UpdateSettingsScreen(void);
+static void DrawSettingsScreen(void);
+
+// Initialization
+static void InitializeApp(void);
+static void CleanupApp(void);
+
+
+//----------------------------------------------------------------------------------
+// Main Entry Point
+//----------------------------------------------------------------------------------
+int main()
 {
-    // Tell the window to use vsync and work on high DPI displays
-    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
-
-    // Create the window and OpenGL context
-    const int screenWidth = 1000;
-    const int screenHeight = 900;
-    InitWindow(screenWidth, screenHeight, "Algowizz");
-    SetTargetFPS(60);
-
-    // Utility function from resource_dir.h to find the resources folder and set it as the current working directory so we can load from it
-    SearchAndSetResourceDir("resources");
-
-    // Load textures
-    Texture wabbit = LoadTexture("wabbit_alpha.png");
-    Texture rec = LoadTexture("rec.png");
-
-    // Define colors
-    Color backgroundColor = BLACK;
-    Color textColor = WHITE;
-    Color buttonColorNormal = GRAY;
-    Color buttonColorHover = DARKGRAY;
-
-    // Menu title
-    const char* menuTitle = "Welcome to Algowizz";
-    int titleFontSize = 40;
-    Vector2 titlePosition = { (float)screenWidth / 2 - MeasureText(menuTitle, titleFontSize) / 2, 50 };
-
-    // Button dimensions and spacing
-    float buttonWidth = 200;
-    float buttonHeight = 60;
-    float buttonSpacing = 20;
-    float startY = 200;
-    float centerX = (float)screenWidth / 2;
-
-    // Button texts
-    const char* buttonText1 = "Quicksort";
-    const char* buttonText2 = "Algorithm 2";
-    const char* buttonText3 = "Settings";
-    const char* buttonTextExit = "Exit";
-
-    // Button rectangles
-    Rectangle buttonRect1 = { centerX - buttonWidth / 2, startY, buttonWidth, buttonHeight };
-    Rectangle buttonRect2 = { centerX - buttonWidth / 2, startY + buttonHeight + buttonSpacing, buttonWidth, buttonHeight };
-    Rectangle buttonRect3 = { centerX - buttonWidth / 2, startY + 2 * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight };
-    Rectangle buttonRectExit = { centerX - buttonWidth / 2, startY + 3 * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight };
-
-    // Game state
-    int gameState = 0; // 0: main menu, 1: Quicksort, 2: Algorithm 2, 3: Settings
-
-    // Quicksort data
-    QuickSortData quickSortData = { 0 };
+    InitializeApp();
 
     // Main game loop
     while (!WindowShouldClose())
     {
-        // Input handling
-        Vector2 mousePosition = GetMousePosition();
-
-        if (gameState == 0) // Main menu state
-        {
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
-            {
-                if (CheckCollisionPointRec(mousePosition, buttonRect1))
-                {
-                    gameState = 1; // Go to Quicksort visualization
-                    // Initialize quicksort data
-                    srand(time(NULL));
-                    quickSortData.size = 50;
-                    quickSortData.array = (int*)MemAlloc(quickSortData.size * sizeof(int));
-                    for (int i = 0; i < quickSortData.size; i++) {
-                        quickSortData.array[i] = rand() % 100 + 1; // Random values between 1 and 100
-                    }
-                    quickSortData.sorting = true;
-                    quickSortData.delayAmount = 5; // Adjust for visualization speed
-                    quickSortData.delayTimer = 0;
-                    quickSortData.pivot = -1;
-                    quickSortData.i = -1;
-                    quickSortData.j = -1;
-                }
-                else if (CheckCollisionPointRec(mousePosition, buttonRect2))
-                {
-                    gameState = 2; // Go to Algorithm 2 screen
-                }
-                else if (CheckCollisionPointRec(mousePosition, buttonRect3))
-                {
-                    gameState = 3; // Go to Settings screen
-                }
-                else if (CheckCollisionPointRec(mousePosition, buttonRectExit))
-                {
-                    break; // Exit the application
-                }
-            }
-        }
-        else if (gameState == 1) // Quicksort visualization
-        {
-            if (IsKeyPressed(KEY_BACKSPACE))
-            {
-                gameState = 0; // Go back to the main menu
-                MemFree(quickSortData.array); // Free allocated memory
-                quickSortData.array = NULL; // Important to set to NULL after freeing
-            }
-
-            if (quickSortData.sorting && quickSortData.array != NULL) {
-                static int low = 0;
-                static int high = 0;
-                static bool initialCall = true;
-
-                if (initialCall) {
-                    high = quickSortData.size - 1;
-                    initialCall = false;
-                }
-
-                if (low < high) {
-                    static int pi = -1;
-                    if (pi == -1) {
-                        pi = partition(quickSortData.array, low, high, &quickSortData);
-                    }
-
-                    static bool firstSubCall = true;
-                    if (firstSubCall) {
-                        firstSubCall = false;
-                        quickSort(quickSortData.array, low, pi - 1, &quickSortData);
-                    }
-
-                    static bool secondSubCall = true;
-                    if (secondSubCall) {
-                        secondSubCall = false;
-                        quickSort(quickSortData.array, pi + 1, high, &quickSortData);
-                    }
-
-                    // Reset for the next level of recursion
-                    if (!firstSubCall && !secondSubCall) {
-                        low++; // This logic needs refinement for proper recursive visualization
-                        high--; // This logic needs refinement for proper recursive visualization
-                        pi = -1;
-                        firstSubCall = true;
-                        secondSubCall = true;
-                    }
-                    if (low >= high) quickSortData.sorting = false; // Basic termination condition - needs better handling
-
-                } else {
-                    quickSortData.sorting = false;
-                }
-            }
-        }
-        else if (gameState > 1)
-        {
-            // Logic for other game states
-            if (IsKeyPressed(KEY_ESCAPE))
-            {
-                gameState = 0; // Go back to the main menu
-            }
-        }
-
-        // Drawing
-        BeginDrawing();
-        ClearBackground(backgroundColor);
-
-        if (gameState == 0) // Main menu
-        {
-            DrawText(menuTitle, titlePosition.x, titlePosition.y, titleFontSize, textColor);
-
-            Color btn1Color = CheckCollisionPointRec(mousePosition, buttonRect1) ? buttonColorHover : buttonColorNormal;
-            DrawRectangleRec(buttonRect1, btn1Color);
-            DrawText(buttonText1, buttonRect1.x + buttonWidth / 2 - MeasureText(buttonText1, 20) / 2, buttonRect1.y + buttonHeight / 2 - 10, 20, textColor);
-
-            Color btn2Color = CheckCollisionPointRec(mousePosition, buttonRect2) ? buttonColorHover : buttonColorNormal;
-            DrawRectangleRec(buttonRect2, btn2Color);
-            DrawText(buttonText2, buttonRect2.x + buttonWidth / 2 - MeasureText(buttonText2, 20) / 2, buttonRect2.y + buttonHeight / 2 - 10, 20, textColor);
-
-            Color btn3Color = CheckCollisionPointRec(mousePosition, buttonRect3) ? buttonColorHover : buttonColorNormal;
-            DrawRectangleRec(buttonRect3, btn3Color);
-            DrawText(buttonText3, buttonRect3.x + buttonWidth / 2 - MeasureText(buttonText3, 20) / 2, buttonRect3.y + buttonHeight / 2 - 10, 20, textColor);
-
-            Color btnExitColor = CheckCollisionPointRec(mousePosition, buttonRectExit) ? buttonColorHover : buttonColorNormal;
-            DrawRectangleRec(buttonRectExit, btnExitColor);
-            DrawText(buttonTextExit, buttonRectExit.x + buttonWidth / 2 - MeasureText(buttonTextExit, 20) / 2, buttonRectExit.y + buttonHeight / 2 - 10, 20, textColor);
-        }
-        else if (gameState == 1) // Quicksort Visualization
-        {
-            DrawText("Quicksort Visualization", 20, 20, 20, textColor);
-            DrawText("Press ESC to go back to the menu", 20, 50, 15, GRAY);
-
-            if (quickSortData.array != NULL) {
-                // Draw the array elements as bars
-                float barWidth = (float)GetScreenWidth() / quickSortData.size;
-                float maxHeight = GetScreenHeight() - 150;
-                for (int i = 0; i < quickSortData.size; i++) {
-                    float barHeight = (float)quickSortData.array[i] / 100 * maxHeight; // Assuming values are within a reasonable range
-                    Color barColor = WHITE;
-                    if (i == quickSortData.pivot) barColor = YELLOW;
-                    else if (i == quickSortData.j) barColor = RED;
-                    else if (i == quickSortData.i) barColor = GREEN;
-
-                    DrawRectangle(i * barWidth, GetScreenHeight() - 100 - barHeight, barWidth - 2, barHeight, barColor);
-                }
-            }
-        }
-        else if (gameState == 2)
-        {
-            DrawText("Algorithm 2 Screen", 20, 20, 20, textColor);
-            DrawText("Press ESC to go back to the menu", 20, 50, 15, GRAY);
-            // Draw your Algorithm 2 visualization here
-        }
-        else if (gameState == 3)
-        {
-            DrawText("Settings Screen", 20, 20, 20, textColor);
-            DrawText("Press ESC to go back to the menu", 20, 50, 15, GRAY);
-            // Add your settings options here
-        }
-
-        EndDrawing();
+        UpdateDrawFrame();
     }
 
-    // Cleanup
-    UnloadTexture(wabbit);
-    UnloadTexture(rec);
-    if (quickSortData.array != NULL) MemFree(quickSortData.array);
-    CloseWindow();
+    CleanupApp();
     return 0;
+}
+
+//----------------------------------------------------------------------------------
+// Module Functions Definition
+//----------------------------------------------------------------------------------
+void InitializeApp(void) {
+     // Tell the window to use vsync and work on high DPI displays
+    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT); // Added Anti-aliasing hint
+
+    // Create the window and OpenGL context
+    InitWindow(screenWidth, screenHeight, "Algowizz++");
+    SetTargetFPS(60);
+    SetExitKey(KEY_NULL); // Disable default ESC exit, handle manually
+
+    // Utility function from resource_dir.h to find the resources folder
+    SearchAndSetResourceDir("resources");
+
+    // Load resources
+    buttonTexture = LoadTexture("rec.png"); // Make sure rec.png is in resources
+    if (buttonTexture.id == 0) {
+        // Handle error - texture not loaded (draw default rects?)
+        TraceLog(LOG_WARNING, "Failed to load button texture 'rec.png'");
+        // Use basic colors if texture fails
+    }
+
+    // Define the N-Patch info for the button texture
+    // Assuming rec.png is a simple 3x3 grid for stretching
+    // Adjust these values based on your actual rec.png image borders
+    buttonNpatchInfo = {
+        (Rectangle){ 0.0f, 0.0f, (float)buttonTexture.width, (float)buttonTexture.height },
+        8, 8, 8, 8, // Left, top, right, bottom border sizes in pixels
+        NPATCH_NINE_PATCH // Layout type
+    };
+
+    // Optional: Load custom font
+    // mainFont = LoadFont("your_font.ttf"); // Make sure font is in resources
+
+    // Initialize Visualization State
+    InitializeVisualizationState(vizState, 50); // Default size 50
+}
+
+void CleanupApp(void) {
+    UnloadTexture(buttonTexture);
+    // UnloadFont(mainFont); // If loaded
+    if (!vizState.array.empty()) {
+        // vector manages its own memory, no MemFree needed unless using raw pointers
+    }
+    CloseWindow();
+}
+
+
+void UpdateDrawFrame(void)
+{
+    // Update based on the current screen
+    switch (currentScreen) {
+        case SCREEN_MAIN_MENU:
+            UpdateMainMenuScreen();
+            break;
+        case SCREEN_VISUALIZATION:
+            UpdateVisualizationScreen();
+            break;
+        case SCREEN_SETTINGS:
+             UpdateSettingsScreen();
+             break;
+        default: break;
+    }
+
+    // Draw
+    BeginDrawing();
+    ClearBackground(DARKGRAY); // Use a slightly less harsh background
+
+    switch (currentScreen) {
+        case SCREEN_MAIN_MENU:
+            DrawMainMenuScreen();
+            break;
+        case SCREEN_VISUALIZATION:
+            DrawVisualizationScreen();
+            break;
+         case SCREEN_SETTINGS:
+             DrawSettingsScreen();
+             break;
+        default: break;
+    }
+
+    // Optional: Draw FPS
+    DrawFPS(10, 10);
+
+    EndDrawing();
+}
+
+// --- Main Menu Screen ---
+void UpdateMainMenuScreen(void) {
+    // No per-frame update needed here unless adding animations
+     if (IsKeyPressed(KEY_Q)) exit(0); // Quick exit with Q
+}
+
+void DrawMainMenuScreen(void) {
+    // Title
+    const char* title = "Algowizz++";
+    int titleFontSize = 60;
+    int titleWidth = MeasureText(title, titleFontSize); // Use mainFont if loaded
+    DrawText(title, (screenWidth - titleWidth) / 2, 80, titleFontSize, WHITE); // Use mainFont if loaded
+
+    // Button properties
+    float buttonWidth = 250;
+    float buttonHeight = 50;
+    float buttonSpacing = 20;
+    float startY = 200;
+    float centerX = (float)screenWidth / 2;
+
+    // Button Colors
+    Color btnNormal = WHITE; // Tint for N-Patch
+    Color btnHover = LIGHTGRAY;
+    Color btnPressed = GRAY;
+    Color textColor = BLACK;
+
+    // Algorithm Buttons
+    NButton quicksortButton = {
+        { centerX - buttonWidth / 2, startY, buttonWidth, buttonHeight },
+        "Quicksort", buttonTexture, buttonNpatchInfo,
+        btnNormal, btnHover, btnPressed, textColor, 20
+    };
+    if (DrawNButton(quicksortButton)) {
+        vizState.currentAlgorithm = ALGO_QUICKSORT;
+        ResetVisualizationState(vizState); // Prepare state for this algo
+        currentScreen = SCREEN_VISUALIZATION;
+    }
+
+     NButton bubbleButton = {
+         { centerX - buttonWidth / 2, startY + (buttonHeight + buttonSpacing) * 1, buttonWidth, buttonHeight },
+         "Bubble Sort", buttonTexture, buttonNpatchInfo,
+         btnNormal, btnHover, btnPressed, textColor, 20
+     };
+     if (DrawNButton(bubbleButton)) {
+         vizState.currentAlgorithm = ALGO_BUBBLESORT;
+         ResetVisualizationState(vizState);
+         currentScreen = SCREEN_VISUALIZATION;
+     }
+
+      NButton insertionButton = {
+         { centerX - buttonWidth / 2, startY + (buttonHeight + buttonSpacing) * 2, buttonWidth, buttonHeight },
+         "Insertion Sort", buttonTexture, buttonNpatchInfo,
+         btnNormal, btnHover, btnPressed, textColor, 20
+     };
+      if (DrawNButton(insertionButton)) {
+          vizState.currentAlgorithm = ALGO_INSERTIONSORT;
+          ResetVisualizationState(vizState);
+          currentScreen = SCREEN_VISUALIZATION;
+      }
+
+    // Settings Button (placeholder)
+     NButton settingsButton = {
+         { centerX - buttonWidth / 2, startY + (buttonHeight + buttonSpacing) * 3, buttonWidth, buttonHeight },
+         "Settings", buttonTexture, buttonNpatchInfo,
+         btnNormal, btnHover, btnPressed, textColor, 20
+     };
+     if (DrawNButton(settingsButton)) {
+         currentScreen = SCREEN_SETTINGS;
+     }
+
+
+    // Exit Button
+    NButton exitButton = {
+        { centerX - buttonWidth / 2, startY + (buttonHeight + buttonSpacing) * 4 + 40, buttonWidth, buttonHeight }, // Extra space before exit
+        "Exit", buttonTexture, buttonNpatchInfo,
+        btnNormal, {255, 100, 100, 255} , {200, 80, 80, 255}, textColor, 20 // Red hover/press for exit
+    };
+    if (DrawNButton(exitButton)) {
+       CloseWindow(); // Trigger the main loop exit condition
+       // Note: CleanupApp() will be called after the loop breaks
+    }
+}
+
+
+// --- Visualization Screen ---
+void UpdateVisualizationScreen(void) {
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+        // Optional: Pause before going back?
+        vizState.status = VIZ_STATE_IDLE;
+        vizState.currentAlgorithm = ALGO_NONE; // Deselect algo when going back
+        currentScreen = SCREEN_MAIN_MENU;
+        return; // Prevent further updates this frame
+    }
+
+    // Update the core visualization state machine
+    UpdateVisualization(vizState, GetFrameTime());
+}
+
+void DrawVisualizationScreen(void) {
+    // Define areas
+    Rectangle controlPanelRect = { 0, 0, (float)screenWidth, 60 }; // Top panel for controls
+    Rectangle vizPanelRect = { 0, controlPanelRect.height, (float)screenWidth, (float)screenHeight - controlPanelRect.height }; // Rest of screen for bars
+
+    // Draw Backgrounds for panels (optional)
+    DrawRectangleRec(controlPanelRect, { 30, 30, 30, 255 }); // Darker background for controls
+    DrawRectangleRec(vizPanelRect, { 50, 50, 50, 255 });     // Slightly lighter for viz area
+
+    // Draw the visualization bars
+    DrawVisualizationPanel(vizState, vizPanelRect);
+
+    // Draw the control panel UI elements
+    DrawControlPanel(vizState, controlPanelRect, buttonTexture, buttonNpatchInfo);
+
+    // Draw Algorithm Title
+    const char* algoTitle = "Select Algorithm";
+    switch(vizState.currentAlgorithm) {
+        case ALGO_QUICKSORT: algoTitle = "Quicksort"; break;
+        case ALGO_BUBBLESORT: algoTitle = "Bubble Sort"; break;
+        case ALGO_INSERTIONSORT: algoTitle = "Insertion Sort"; break;
+        default: break;
+    }
+     DrawText(algoTitle, (int)controlPanelRect.x + 15, screenHeight - 30, 20, LIGHTGRAY); // Bottom left corner
+     DrawText(TextFormat("Array Size: %d", vizState.size), screenWidth - 150, screenHeight - 30, 20, LIGHTGRAY); // Bottom Right
+
+     // Draw instructions
+     DrawText("ESC/Backspace: Back to Menu", 10, screenHeight - 50, 10, GRAY);
+}
+
+// --- Settings Screen (Placeholder) ---
+void UpdateSettingsScreen(void) {
+     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+         currentScreen = SCREEN_MAIN_MENU;
+     }
+    // Handle settings changes here (e.g., default array size)
+}
+
+void DrawSettingsScreen(void) {
+    DrawText("Settings", (screenWidth - MeasureText("Settings", 40)) / 2, 100, 40, WHITE);
+    DrawText("Nothing here yet!", (screenWidth - MeasureText("Nothing here yet!", 20)) / 2, 200, 20, LIGHTGRAY);
+    DrawText("Press ESC or Backspace to return", (screenWidth - MeasureText("Press ESC or Backspace to return", 20)) / 2, 250, 20, GRAY);
+
+    // Add sliders or buttons for settings later
 }
